@@ -58,6 +58,7 @@ def view_images(images, num_rows=1, offset_ratio=0.02):
                 i * num_cols + j]
 
     pil_img = Image.fromarray(image_)
+    pil_img.show()
     display(pil_img)
 
 
@@ -160,7 +161,8 @@ def text2image_ldm_stable(
     latent, latents = init_latent(latent, model, height, width, generator, batch_size)
     
     # set timesteps
-    extra_set_kwargs = {"offset": 1}
+    # extra_set_kwargs = {"offset": 1}
+    extra_set_kwargs = {}
     model.scheduler.set_timesteps(num_inference_steps, **extra_set_kwargs)
     for t in tqdm(model.scheduler.timesteps):
         latents = diffusion_step(model, controller, latents, context, t, guidance_scale, low_resource)
@@ -178,7 +180,7 @@ def register_attention_control(model, controller):
         else:
             to_out = self.to_out
 
-        def forward(x, context=None, mask=None):
+        def forward(x, context=None, mask=None, encoder_hidden_states=None, attention_mask=None):
             batch_size, sequence_length, dim = x.shape
             h = self.heads
             q = self.to_q(x)
