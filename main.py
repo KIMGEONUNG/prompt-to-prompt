@@ -12,13 +12,14 @@ import seq_aligner
 import os
 
 LOW_RESOURCE = False
-NUM_DIFFUSION_STEPS = 50
+NUM_DIFFUSION_STEPS = 100
 GUIDANCE_SCALE = 7.5
 MAX_NUM_WORDS = 77
 device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device(
     'cpu')
 
-path_model = os.path.join(os.path.expanduser('~'), "models/stable-diffusion-v1-4")
+path_model = os.path.join(os.path.expanduser('~'),
+                          "models/stable-diffusion-v1-4")
 # path_model = os.path.join(os.path.expanduser('~'), "models/stable-diffusion-2-1") # Not work
 
 ldm_stable = StableDiffusionPipeline.from_pretrained(path_model).to(device)
@@ -285,8 +286,6 @@ def get_equalizer(text: str, word_select: Union[int, Tuple[int, ...]],
     return equalizer
 
 
-
-
 def aggregate_attention(attention_store: AttentionStore, res: int,
                         from_where: List[str], is_cross: bool, select: int):
     out = []
@@ -369,8 +368,12 @@ def run_and_display(prompts,
         guidance_scale=GUIDANCE_SCALE,
         generator=generator,
         low_resource=LOW_RESOURCE)
-    Image.fromarray(images[0]).save("outputs/y.jpg", quality=100, subsampling=0)
-    Image.fromarray(images[1]).save("outputs/y_hat.jpg", quality=100, subsampling=0)
+    Image.fromarray(images[0]).save("outputs/y.jpg",
+                                    quality=100,
+                                    subsampling=0)
+    Image.fromarray(images[1]).save("outputs/y_hat.jpg",
+                                    quality=100,
+                                    subsampling=0)
 
     ptp_utils.view_images(images)
     return images, x_t
@@ -378,15 +381,31 @@ def run_and_display(prompts,
 
 if __name__ == "__main__":
 
-    t_0 = "a red bird in the forest"
-    t_1 = "a blue bird in the forest"
+    t_0 = "people walks in the city at bright afternoon"
+    t_1 = "people walks in the city at dark night"
 
-    g_cpu = torch.Generator().manual_seed(8890)
+    g_cpu = torch.Generator().manual_seed(8888)
     width = height = 512
     shape_latent = 1, ldm_stable.unet.in_channels, height // 8, width // 8
     x_t = torch.randn(shape_latent, generator=g_cpu)
 
-    if True:
+    if True:  # GLOBL EDIT
+        prompts = ["house on a mountain", "house on a mountain with detailed high-quality professional image"]
+        # prompts = [
+        #     "house on a mountain", "house on a mountain at rainy day"
+        # ]
+        controller = AttentionRefine(
+            prompts,
+            NUM_DIFFUSION_STEPS,
+            # cross_replace_steps=0.5,
+            # self_replace_steps=0.5,
+            cross_replace_steps=.8,
+            self_replace_steps=.4,
+        )
+        run_and_display(prompts, controller, latent=x_t)
+        pass
+
+    if False:  # ATTENTION REPLACEMENT
         prompts = [t_0, t_1]
         # cross_rpl = 0.01  # More small, More similar structure
 
@@ -412,15 +431,14 @@ if __name__ == "__main__":
             latent=x_t,
             run_baseline=True,
         )
-    if False:
+    if False:  # LOCAL EDIT
         prompts = [t_0, t_1]
         lb = LocalBlend(prompts, ("red", "blue"))
-        controller = AttentionReplace(
-            prompts,
-            NUM_DIFFUSION_STEPS,
-            cross_replace_steps={
-                "default_": 1.,
-            },
-            self_replace_steps=1.0,
-            local_blend=lb)
+        controller = AttentionReplace(prompts,
+                                      NUM_DIFFUSION_STEPS,
+                                      cross_replace_steps={
+                                          "default_": 1.,
+                                      },
+                                      self_replace_steps=1.0,
+                                      local_blend=lb)
         run_and_display(prompts, controller, latent=x_t, run_baseline=True)
