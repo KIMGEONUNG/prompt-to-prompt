@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import argparse
+from datetime import datetime
 from PIL import Image
 from typing import Optional, Union, Tuple, List, Callable, Dict
 import torch
@@ -10,6 +12,8 @@ import abc
 import ptp_utils
 import seq_aligner
 import os
+from os import makedirs
+from os.path import join
 
 LOW_RESOURCE = False
 NUM_DIFFUSION_STEPS = 100
@@ -375,35 +379,69 @@ def run_and_display(prompts,
                                     quality=100,
                                     subsampling=0)
 
-    ptp_utils.view_images(images)
+    # ptp_utils.view_images(images)
     return images, x_t
 
 
+def parse():
+    p = argparse.ArgumentParser()
+    p.add_argument('--path', default='config.yaml')
+    p.add_argument('--seed',
+                   default=[
+                       8888,
+                       8889,
+                       8890,
+                       8891,
+                       8892,
+                       8893,
+                       8894,
+                       8895,
+                       8896,
+                       8897,
+                   ],
+                   type=int,
+                   nargs='+')
+    p.add_argument('--type', default='global', choices=['global', 'local'])
+    return p.parse_args()
+
+
 if __name__ == "__main__":
+    args = parse()
 
     t_0 = "people walks in the city at bright afternoon"
     t_1 = "people walks in the city at dark night"
 
-    g_cpu = torch.Generator().manual_seed(8888)
     width = height = 512
     shape_latent = 1, ldm_stable.unet.in_channels, height // 8, width // 8
-    x_t = torch.randn(shape_latent, generator=g_cpu)
 
-    if True:  # GLOBL EDIT
-        prompts = ["house on a mountain", "house on a mountain with detailed high-quality professional image"]
-        # prompts = [
-        #     "house on a mountain", "house on a mountain at rainy day"
-        # ]
-        controller = AttentionRefine(
-            prompts,
-            NUM_DIFFUSION_STEPS,
-            # cross_replace_steps=0.5,
-            # self_replace_steps=0.5,
-            cross_replace_steps=.8,
-            self_replace_steps=.4,
-        )
-        run_and_display(prompts, controller, latent=x_t)
-        pass
+    prompts = [
+        "a castle next to a river",
+        "children drawing of a castle next to a river"
+    ]
+    if args.type == 'global':
+        ID = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dir_out = f"logs/{ID}"
+        makedirs(dir_out)
+        for seed in args.seed:
+
+            g_cpu = torch.Generator().manual_seed(seed)
+            x_t = torch.randn(shape_latent, generator=g_cpu)
+            controller = AttentionRefine(prompts,
+                                         NUM_DIFFUSION_STEPS,
+                                         cross_replace_steps=.8,
+                                         self_replace_steps=.4)
+            img, _ = run_and_display(prompts, controller, latent=x_t)
+
+            Image.fromarray(img[0]).save(
+                join(dir_out, f"{seed:06}y.jpg"),
+                quality=100,
+                subsampling=0,
+            )
+            Image.fromarray(img[1]).save(
+                join(dir_out, f"{seed:06}y_hat.jpg"),
+                quality=100,
+                subsampling=0,
+            )
 
     if False:  # ATTENTION REPLACEMENT
         prompts = [t_0, t_1]
